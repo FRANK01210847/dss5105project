@@ -1,23 +1,21 @@
-# ===== Core Framework =====
 streamlit==1.38.0
 python-dotenv==1.0.1
 
-# ===== LangChain Ecosystem (Modern split) =====
-langchain-core==0.3.12
-langchain-community==0.3.1
-openai==1.43.0
+# ---- LangChain ecosystem (Stable Combo) ----
+langchain==0.3.7
+langchain-core==0.3.19
+langchain-community==0.3.7
+langchain-openai==0.2.3
+
+# ---- OpenAI + Tokenizer ----
+openai==1.44.1
 tiktoken==0.7.0
 
-# ===== File Handling / Parsing =====
+# ---- Vector + PDF + Utils ----
+faiss-cpu==1.8.0
 PyPDF2==3.0.1
+qrcode==7.4.2
 python-multipart==0.0.9
 pillow==10.3.0
-
-# ===== Vector / Math / Data =====
-faiss-cpu==1.8.0
-numpy==1.26.4
 pandas==2.2.3
-
-# ===== Misc =====
-qrcode==7.4.2
-langchain-openai==0.1.7
+numpy==1.26.4

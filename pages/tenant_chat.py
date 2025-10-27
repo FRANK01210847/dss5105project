@@ -6,10 +6,11 @@ from streamlit.components.v1 import html as st_html
 from dotenv import load_dotenv
 
 # 🧠 核心 LangChain 结构
-from langchain.agents import initialize_agent, AgentType
+from langchain_community.agents import initialize_agent, AgentType
 from langchain_community.chat_models import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
+
 
 
 
