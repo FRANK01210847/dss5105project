@@ -1,21 +1,21 @@
-streamlit==1.38.0
-python-dotenv==1.0.1
-
-# ---- LangChain ecosystem (Stable Combo) ----
-langchain==0.3.7
-langchain-core==0.3.19
-langchain-community==0.3.7
-langchain-openai==0.2.3
-
-# ---- OpenAI + Tokenizer ----
-openai==1.44.1
-tiktoken==0.7.0
-
-# ---- Vector + PDF + Utils ----
-faiss-cpu==1.8.0
-PyPDF2==3.0.1
-qrcode==7.4.2
-python-multipart==0.0.9
-pillow==10.3.0
-pandas==2.2.3
-numpy==1.26.4
+streamlit>=1.38,<1.41
+python-dotenv>=1.0,<2.0
+␊
+# ---- LangChain ecosystem (aligned versions to avoid resolver conflicts) ----
+langchain==0.2.16
+langchain-community==0.2.16
+langchain-core==0.2.38
+langchain-openai==0.1.7
+␊
+# ---- OpenAI + Tokenizer ----␊
+openai>=1.37,<1.45
+tiktoken>=0.7,<0.8
+␊
+# ---- Vector + PDF + Utils ----␊
+faiss-cpu==1.8.0␊
+PyPDF2==3.0.1␊
+qrcode==7.4.2␊
+python-multipart==0.0.9␊
+pillow>=10.3,<11.0
+pandas>=2.2,<2.3
+numpy>=1.26,<2.0
