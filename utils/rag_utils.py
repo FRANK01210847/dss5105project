@@ -13,7 +13,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter  # ✅ 保留
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.chat_models import ChatOpenAI
-from langchain_core.memory import ConversationBufferMemory  # ✅ 改这里
+from langchain.memory import ConversationBufferMemory
+ # ✅ 改这里
 from langchain.chains import ConversationalRetrievalChain    # ✅ 改这里
 
 
