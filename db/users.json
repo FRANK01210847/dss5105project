@@ -1,0 +1,22 @@
+{
+    "landlords": {
+        "ken": {
+            "password": "e9cee71ab932fde863338d08be4de9dfe39ea049bdafb342ce659ec5450b69ae",
+            "email": ""
+        },
+        "makabaka": {
+            "password": "010ab7400efc22e69be4da065eb06e03a9edbce360845b1f43009e1a7b942b9e",
+            "email": ""
+        }
+    },
+    "tenants": {
+        "ken": {
+            "password": "e9cee71ab932fde863338d08be4de9dfe39ea049bdafb342ce659ec5450b69ae",
+            "email": "ken@example.com"
+        },
+        "makabaka": {
+            "password": "010ab7400efc22e69be4da065eb06e03a9edbce360845b1f43009e1a7b942b9e",
+            "email": ""
+        }
+    }
+}
