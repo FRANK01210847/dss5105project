@@ -1,23 +1,24 @@
-# ====== Core ======
+# ===== Core =====
 streamlit==1.50.0
 python-dotenv==1.0.1
 
-# ====== LangChain and AI ======
-langchain==0.0.350
-langchain-community==0.0.24
-openai==1.3.0
-tiktoken==0.5.0
-pydantic<2.0
+# ===== LangChain & AI (社区拆包时代) =====
+# 这套版本允许：langchain.agents.initialize_agent + langchain_community.*
+langchain==0.1.20
+langchain-community==0.0.38
+openai==1.30.3
+tiktoken==0.7.0
+pydantic==2.8.2
 
-# ====== File and Parsing ======
+# ===== File / Parsing =====
 PyPDF2==3.0.1
-python-multipart==0.0.6
-pillow==10.0.0
+python-multipart==0.0.9
+pillow==10.4.0
 
-# ====== Data Processing ======
-faiss-cpu==1.11.0
+# ===== Data =====
+faiss-cpu==1.12.0     # Py3.12 对应的轮子
 pandas==2.2.2
 numpy==1.26.4
 
-# ====== Misc ======
+# ===== Misc =====
 qrcode==8.0
