@@ -1,16 +1,15 @@
 {
   "property_id": "2025001",
-  "tenant_name": "Michael Thompson Anderson",
-  "landlord_name": "Peter Richardson Williams",
-  "property_address": "88 Orchard Boulevard #15-03, Singapore 238863",
-  "monthly_rent": "S$ 7500",
-  "deposit": "S$15000",
-  "lease_start": "2024-02-22",
-  "lease_end": "2026-02-22",
-  "lease_term_months": 24,
-  "last_updated": "2025-10-30 23:28:17",
-  "version_note": "v1",
-  "cloud_link": "https://www.dropbox.com/scl/fi/bxkkykjmbrk16620umarf/Track_B_Tenancy_Agreement.pdf?rlkey=m4kfb4o1yjxokac4wk6e9w8g1&st=go4vl6bw&dl=1",
+  "tenant_name": "frank",
+  "landlord_name": "Mr. Jonathan Ong",
+  "property_address": "25 Lorong 33 Geylang #05-06, Singapore 387985",
+  "monthly_rent": "S$3,600",
+  "deposit": "S$7,200",
+  "lease_start": "2025-12-01",
+  "lease_end": "2026-11-30",
+  "lease_term_months": 12,
+  "last_updated": "2025-10-31 05:14:46",
+  "cloud_link": "https://www.dropbox.com/scl/fi/m1e4ty3093oy9wfcai6hw/Virtual_Tenancy_Agreement_4.pdf?rlkey=v917k6q2mcrmihy65b7iio0oo&st=cu71dkjb&dl=0",
   "qr_code": "contract_qr.png",
-  "previous_version": null
+  "previous_version": "2025-10-30 23:28:17"
 }
