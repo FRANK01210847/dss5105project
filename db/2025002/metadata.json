@@ -1,10 +1,16 @@
 {
   "property_id": "2025002",
-  "tenant_name": "gan",
-  "monthly_rent": "S$ 7500",
-  "last_updated": "2025-10-30 17:02:23",
+  "tenant_name": "David Wei Chen Liu",
+  "landlord_name": "Sophia Mei Ling Tan",
+  "property_address": "123 Jurong East Street #06-22, Singapore 609631",
+  "monthly_rent": "S$ 5800",
+  "deposit": "S$11600",
+  "lease_start": "2024-04-01",
+  "lease_end": "2025-10-01",
+  "lease_term_months": 18,
+  "last_updated": "2025-10-30 23:28:58",
   "version_note": "v1",
-  "cloud_link": "",
-  "qr_code": "",
-  "previous_version": "2025-10-30 16:35:52"
+  "cloud_link": "https://www.dropbox.com/scl/fi/buul3lxusq2kk7whefc1d/TENANCY-AGREEMENT-1.pdf?rlkey=46vxov5n7uj29iffg11swnzyq&st=xplq6h0s&dl=1",
+  "qr_code": "contract_qr.png",
+  "previous_version": null
 }

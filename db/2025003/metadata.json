@@ -1,10 +1,16 @@
 {
   "property_id": "2025003",
-  "tenant_name": "ken",
-  "monthly_rent": 8000,
-  "last_updated": "2025-10-27 16:06:30",
-  "version_note": "v5",
-  "cloud_link": "https://www.dropbox.com/scl/fi/elu7ktwqp8ear0pbqnkne/TENANCY-AGREEMENT-2.pdf?rlkey=uwnbq1by2ae9oiizthgmwzd45&st=mt57b4qn&dl=1",
+  "tenant_name": "David Kumar Raj",
+  "landlord_name": "Lim Mei Ling",
+  "property_address": "123 Jurong East Street 21 #09-22, Singapore 600123",
+  "monthly_rent": "S$ 5800",
+  "deposit": "S$11600",
+  "lease_start": "2024-04-01",
+  "lease_end": "2025-10-01",
+  "lease_term_months": 18,
+  "last_updated": "2025-10-30 23:29:39",
+  "version_note": "v1",
+  "cloud_link": "https://www.dropbox.com/scl/fi/elu7ktwqp8ear0pbqnkne/TENANCY-AGREEMENT-2.pdf?rlkey=uwnbq1by2ae9oiizthgmwzd45&st=0cxu329d&dl=1",
   "qr_code": "contract_qr.png",
-  "previous_version": "2025-10-27 15:55:43"
+  "previous_version": null
 }

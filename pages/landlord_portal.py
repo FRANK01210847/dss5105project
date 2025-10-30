@@ -1,4 +1,4 @@
-import os, json, time, shutil
+import os, json, time, shutil, re
 import streamlit as st
 import qrcode
 from io import BytesIO
@@ -54,20 +54,54 @@ with st.sidebar:
             st.success("✅ Set successfully")
 
 # ========== 上传合同部分 ==========
-st.markdown("### Upload Contract → Database")
-c1, c2 = st.columns([1.2, 1.8], gap="large")
+# Simplified heading
+st.markdown("### Upload Contract")
+# Custom CSS: make the trashcan button borderless and slightly larger (targets the button by aria-label)
+st.markdown("""
+<style>
+/* Larger, borderless trashcan button; centered via margins */
+button[aria-label="🗑️"] {
+    border: none !important;
+    background: transparent !important;
+    padding: 6px !important;
+    font-size: 24px !important;
+    height: 40px !important;
+    width: 40px !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+button[aria-label="🗑️"]:hover {
+    background: rgba(0,0,0,0.04) !important;
+    border-radius: 8px !important;
+}
+/* Ensure the button's parent container centers its content (helps vertical/horizontal centering) */
+div.stButton {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+}
+
+/* Narrow global button padding to reduce rounded-rectangle appearance */
+div.stButton > button {
+    padding: 0.25rem 0.25rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+# Give the Existing Leases column more width (right side) to reduce crowding
+c1, c2 = st.columns([1, 3], gap="large")
 
 with c1:
     property_id = st.text_input("🏠 Property ID (Unique)", placeholder="e.g. MSH2025-001")
-    tenant_name = st.text_input("👤 Tenant Name", placeholder="e.g. Ken")
-    version_note = st.text_input("📝 Version Note (Optional)", placeholder="e.g. First Version / Adjusted Deposit")
+    tenant_name_input = st.text_input("👤 Tenant Name", placeholder="e.g. John Tan")
     cloud_link = st.text_input("☁️ Cloud Link (Optional)", placeholder="e.g. OneDrive/iCloud Share Link")
     up = st.file_uploader("📄 Upload Tenancy Agreement PDF", type=["pdf"])
 
     if st.button("Save to Database", type="primary", use_container_width=True):
         os.makedirs("db", exist_ok=True)
-        if not (property_id and up):
-            st.error("Please fill in the Property ID and upload the contract.")
+        # Require tenant name as a mandatory field
+        if not (property_id and tenant_name_input and up):
+            st.error("Please fill in the Property ID, Tenant Name, and upload the contract.")
         else:
             save_dir = os.path.join("db", property_id)
             os.makedirs(save_dir, exist_ok=True)
@@ -110,9 +144,64 @@ with c1:
                     """
 
                     with st.spinner("AI is analyzing contract differences..."):
-                        analysis = llm.predict(analysis_prompt)
-                        st.markdown("### 📄 Contract Difference Analysis")
-                        st.markdown(analysis)
+                        # Ask the model to return ONLY the differences between the two contracts.
+                        # Output must be concise bullet points and must NOT include any unchanged sections.
+                        differences_prompt = f"""
+                        Compare the OLD and NEW rental contracts below and output ONLY the items that changed between the two versions.
+                        Return the changed items in the EXACT order below (omit any field that did not change):
+                        1) LANDLORD NAME
+                        2) TENANT NAME
+                        3) MONTHLY RENT
+                        4) SECURITY DEPOSIT
+                        5) LEASE TERM / START / END
+                        6) PROPERTY ADDRESS / PREMISES
+                        7) UTILITIES
+                        8) REPAIRS AND MAINTENANCE
+                        9) TERMINATION / PENALTIES
+                        10) ADDITIONAL CLAUSES
+
+                        For each change, provide a single concise bullet point in this format:
+                        - FIELD: Old: <old value> -> New: <new value>
+
+                        If a field cannot be precisely extracted, describe the change in one short sentence.
+                        If there are no material differences, output exactly: No material differences detected.
+                        Do not include any extra explanation or unchanged text.
+
+                        OLD CONTRACT:
+                        {old_text}
+
+                        NEW CONTRACT:
+                        {new_text}
+                        """
+
+                        try:
+                            diffs = llm.predict(differences_prompt).strip()
+                        except Exception:
+                            # fallback to the full analysis if diff-only prompt fails
+                            diffs = llm.predict(analysis_prompt)
+
+                        # Try to auto-clean the diffs into well-formatted Markdown using the LLM
+                        cleaned = None
+                        try:
+                            llm_fix = ChatOpenAI(
+                                model_name="gpt-4o-mini",
+                                temperature=0,
+                                openai_api_key=os.getenv("OPENAI_API_KEY")
+                            )
+                            fix_prompt = f"""
+                            The following contract difference report may contain formatting issues (missing spaces, malformed punctuation).
+                            Reformat it into a clean Markdown bullet list. Preserve the meaning exactly but fix spacing, punctuation, and ensure each change is a separate bullet.
+
+                            Report:
+                            {diffs}
+                            """
+                            cleaned = llm_fix.predict(fix_prompt).strip()
+                        except Exception:
+                            cleaned = None
+
+                        # Save the cleaned version if available, otherwise save the raw diffs
+                        st.session_state['last_diffs'] = cleaned or diffs
+                        st.info("✅ Comparison ready. Click 'View full report' on the right to view the differences.")
 
                     os.remove(temp_path)
 
@@ -126,6 +215,15 @@ with c1:
                 f.write(up.getvalue())
 
             # ---------- 自动提取租金 ----------
+            # initialize defaults so metadata is always populated even if extraction fails
+            tenant_final = None
+            landlord_final = st.session_state.get("username") or None
+            deposit_final = "N/A"
+            lease_months_final = None
+            lease_start = None
+            lease_end = None
+            prop_addr_final = ""
+
             try:
                 loader = PyPDFLoader(pdf_path)
                 pages = loader.load()
@@ -152,6 +250,86 @@ with c1:
                         st.warning("⚠️ Monthly rent not found in the document.")
                     else:
                         st.success(f"✅ Detected monthly rent: {rent_extracted}")
+
+                # ---------- 更丰富的信息提取（尝试以 JSON 输出） ----------
+                extract_prompt = f"""
+                Extract the following fields from the contract text and output a JSON object ONLY.
+                Fields: monthly_rent, lease_start (YYYY-MM-DD or null), lease_end (YYYY-MM-DD or null), lease_term_months (integer or null), deposit_amount (SGD, like "S$1200" or null), landlord_name (string or null), tenant_name (string or null), property_address (string or null).
+
+                If a field cannot be found, use null. Do not output any explanatory text.
+
+                Contract text:
+                {text}
+                """
+
+                with st.spinner("🔍 Extracting structured metadata from contract..."):
+                    try:
+                        extracted_raw = llm.predict(extract_prompt).strip()
+                        # try to parse JSON directly
+                        extracted_json = None
+                        try:
+                            extracted_json = json.loads(extracted_raw)
+                        except Exception:
+                            # attempt to find a JSON substring
+                            jmatch = re.search(r"\{[\s\S]*\}", extracted_raw)
+                            if jmatch:
+                                try:
+                                    extracted_json = json.loads(jmatch.group(0))
+                                except Exception:
+                                    extracted_json = None
+
+                        if extracted_json is None:
+                            raise ValueError("LLM did not return valid JSON")
+
+                        lease_start = extracted_json.get("lease_start")
+                        lease_end = extracted_json.get("lease_end")
+                        lease_term_months = extracted_json.get("lease_term_months")
+                        deposit_amount = extracted_json.get("deposit_amount")
+                        landlord_name_ex = extracted_json.get("landlord_name")
+                        tenant_name_ex = extracted_json.get("tenant_name")
+                        property_address_ex = extracted_json.get("property_address")
+                    except Exception:
+                        # 回退：使用简单的正则从文本中抽取 deposit 与租期信息
+                        lease_start = None
+                        lease_end = None
+                        lease_term_months = None
+                        deposit_amount = None
+                        landlord_name_ex = None
+                        tenant_name_ex = None
+                        property_address_ex = None
+
+                        # deposit: look for 'deposit' near an amount
+                        dmatch = re.search(r"deposit[\s:\-\n\w\W]{0,60}?S\$\s?([\d,]{2,7})", text, re.IGNORECASE)
+                        if not dmatch:
+                            dmatch = re.search(r"deposit[\s:\-\n\w\W]{0,60}?\$\s?([\d,]{2,7})", text, re.IGNORECASE)
+                        if dmatch:
+                            deposit_amount = f"S${dmatch.group(1).replace(',', '')}"
+
+                        # lease term months: look for 'month' or 'months' near numbers
+                        tmatch = re.search(r"(\d{1,2})\s*(?:months|month|months'?)", text, re.IGNORECASE)
+                        if tmatch:
+                            try:
+                                lease_term_months = int(tmatch.group(1))
+                            except Exception:
+                                lease_term_months = None
+
+                        # attempt to find landlord name (look for 'Landlord' label)
+                        lmatch = re.search(r"Landlord[:\s]+([A-Z][a-zA-Z\s,.'-]{2,60})", text)
+                        if lmatch:
+                            landlord_name_ex = lmatch.group(1).strip()
+
+                        # property address: look for Address: label
+                        amatch = re.search(r"Address[:\s]+([\w\d\s,.-]{5,200})", text)
+                        if amatch:
+                            property_address_ex = amatch.group(1).strip()
+
+                # normalize values
+                # Prefer explicitly entered tenant name; fall back to extracted name or None
+                tenant_final = tenant_name_input or tenant_name_ex or None
+                landlord_final = landlord_name_ex or st.session_state.get("username") or None
+                deposit_final = deposit_amount or "N/A"
+                lease_months_final = lease_term_months or None
+                prop_addr_final = property_address_ex or None
             except Exception as e:
                 st.error(f"❌ Failed to extract rent: {e}")
                 rent_extracted = "N/A"
@@ -192,10 +370,15 @@ with c1:
 
             meta = {
                 "property_id": property_id,
-                "tenant_name": tenant_name,
+                "tenant_name": tenant_final,
+                "landlord_name": landlord_final or st.session_state.get("username"),
+                "property_address": prop_addr_final or "",
                 "monthly_rent": rent_extracted,
+                "deposit": deposit_final,
+                "lease_start": lease_start,
+                "lease_end": lease_end,
+                "lease_term_months": lease_months_final,
                 "last_updated": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "version_note": version_note or "v1",
                 "cloud_link": cloud_link or "",
                 "qr_code": qr_filename or "",
                 "previous_version": old_version_time,
@@ -214,6 +397,13 @@ with c1:
 
 # ========== 右侧：已有合同列表 ==========
 with c2:
+    # If diffs exist in session state, show a compact expander button so user can view full differences on demand
+    if st.session_state.get('last_diffs'):
+        with st.expander("📄 View full report — Contract Differences", expanded=False):
+            report = st.session_state.get('last_diffs')
+            # Render the differences directly (only changed items are present, in the requested order)
+            st.markdown(report)
+
     st.markdown("#### 📂 Existing Leases")
     if "delete_confirm" not in st.session_state:
         st.session_state.delete_confirm = None
@@ -228,20 +418,30 @@ with c2:
                 try:
                     with open(meta_path, "r", encoding="utf-8") as f:
                         m = json.load(f)
+                    # Format rent period
+                    rent_period = "—"
+                    if m.get("lease_start") and m.get("lease_end"):
+                        rent_period = f"{m['lease_start']} to {m['lease_end']}"
+                    elif m.get("lease_term_months"):
+                        rent_period = f"{m.get('lease_term_months')} months"
+                    
+                    # Order: ID, Tenant, Monthly Rent, Rent Period, Address, Last Updated, Cloud Link
                     rows.append([
-                        name,
-                        m.get("tenant_name", "?"),
-                        m.get("monthly_rent", "?"),
-                        m.get("last_updated", "?"),
-                        m.get("version_note", "-"),
-                        "✅" if m.get("cloud_link") else "❌",
+                        name,  # ID
+                        m.get("tenant_name", "-"),  # Tenant
+                        m.get("monthly_rent", "?"),  # Monthly Rent
+                        rent_period,  # Rent Period
+                        m.get("property_address", "—"),  # Address
+                        m.get("last_updated", "?"),  # Last Updated
+                        "✅" if m.get("cloud_link") else "❌",  # Cloud Link
                     ])
                 except json.JSONDecodeError:
                     st.warning(f"⚠️ Skipped corrupted metadata file: {meta_path}")
 
     if rows:
-        header_cols = st.columns([1.2, 1, 1, 1.2, 1, 0.8])
-        headers = ["Tenant ID", "Tenant", "Monthly Rent", "Last Updated", "Version Note", "Cloud Link"]
+        # Adjust column widths: balance Address and Cloud Link so Cloud Link isn't squeezed
+        header_cols = st.columns([0.8, 1.4, 1, 1, 1.6, 1, 0.9, 0.8])
+        headers = ["ID", "Tenant", "Monthly Rent", "Rent Period", "Address", "Last Updated", "Cloud Link", "Delete"]
         for i, h in enumerate(headers):
             with header_cols[i]:
                 st.markdown(f"**{h}**")
@@ -249,13 +449,18 @@ with c2:
         st.markdown("---")
 
         for r in rows:
-            cols = st.columns([1.2, 1, 1, 1.2, 1, 0.8])
+            cols = st.columns([0.8, 1.4, 1, 1, 1.6, 1, 0.9, 0.8])
             for i, v in enumerate(r):
                 with cols[i]:
                     st.text(v)
-
-            if st.button("🗑️", key=f"del_{r[0]}", help=f"Delete lease {r[0]}"):
-                st.session_state.delete_confirm = r[0]
+            # Add delete button centered in the last column
+            with cols[-1]:
+                # Center the trashcan and make the button take more space by using a wider middle column
+                inner = st.columns([2, 5, 2])
+                with inner[1]:
+                    # use_container_width=False so the button keeps the squared size from CSS but is centered by margin:auto
+                    if st.button("🗑️", key=f"del_{r[0]}", help=f"Delete lease {r[0]}", use_container_width=False):
+                        st.session_state.delete_confirm = r[0]
 
         if st.session_state.delete_confirm:
             contract_id = st.session_state.delete_confirm

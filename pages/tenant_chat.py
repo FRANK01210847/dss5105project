@@ -153,28 +153,8 @@ with col_left:
                             st.session_state.contract_meta_map[key] = meta
                             rebuild_pipeline_from_loaded_contracts()
                             st.success(f"✅ Database contract loaded: {cid}")
-
-                            # 云端链接与二维码
-                            cloud_link = meta.get("cloud_link")
-                            qr_code = meta.get("qr_code")
-                            if cloud_link or qr_code:
-                                html_block = "<hr><h4>☁️ Contract Quick Access</h4>"
-                                if cloud_link:
-                                    html_block += f"<p><a href='{cloud_link}' target='_blank'>{cloud_link}</a></p>"
-                                if qr_code:
-                                    qr_path = os.path.join(db_path, qr_code)
-                                    if os.path.exists(qr_path):
-                                        st.session_state["tenant_last_qr"] = qr_path
-                                        st.session_state["tenant_last_contract_id"] = cid
-                                        b64 = base64.b64encode(open(qr_path, "rb").read()).decode()
-                                        html_block += f"<img src='data:image/png;base64,{b64}' width='150'>"
-                                st.session_state["last_contract_display"] = html_block
                         except Exception as e:
                             st.error(f"❌ Loading failed: {e}")
-
-    # ✅ 二维码持久显示
-    if st.session_state.get("last_contract_display"):
-        st.markdown(st.session_state["last_contract_display"], unsafe_allow_html=True)
 
     # === 上传临时合同 ===
     st.markdown("---")
@@ -200,16 +180,18 @@ with col_left:
                 except Exception as e:
                     st.error(f"❌ Parsing failed: {e}")
 
-    # === 删除合同 ===
+    # === 合同列表 ===
     st.markdown("---")
     st.markdown("### 📄 Loaded Contracts")
     if st.session_state.vectorstores_map:
         delete_keys = []
         for key in list(st.session_state.vectorstores_map.keys()):
             meta = st.session_state.contract_meta_map.get(key, {})
+            name = meta.get("property_id") or meta.get("contract_id") or key
+            
+            # 第一行：基本信息和删除按钮
             cols = st.columns([3, 2, 1])
             with cols[0]:
-                name = meta.get("property_id") or meta.get("contract_id") or key
                 icon = "📁" if key.startswith("db:") else "📎"
                 st.markdown(f"**{icon} {name}**")
             with cols[1]:
@@ -231,10 +213,30 @@ with col_left:
                     except Exception:
                         pass
                 st.write(f"Rent: {rent_val}" if rent_val else "Rent: —")
-
             with cols[2]:
                 if st.button("❌", key=f"del_{key}", help="Remove this contract"):
                     delete_keys.append(key)
+            
+            # 第二行：Quick Access 下拉栏
+            with st.expander("🔗 Contract Easy Access", expanded=False):
+                # 云端链接
+                cloud_link = meta.get("cloud_link")
+                if cloud_link:
+                    st.markdown(f"**Cloud Link**: <a href='{cloud_link}' target='_blank'>{cloud_link}</a>", unsafe_allow_html=True)
+                else:
+                    st.info("No cloud link available")
+                
+                # 二维码
+                contract_id = meta.get("contract_id")
+                if contract_id:
+                    qr_path = os.path.join("db", contract_id, "contract_qr.png")
+                    if os.path.exists(qr_path):
+                        with open(qr_path, "rb") as f:
+                            b64 = base64.b64encode(f.read()).decode()
+                            st.markdown(f"**QR Code**:<br><img src='data:image/png;base64,{b64}' width='150'>", unsafe_allow_html=True)
+            
+            # 分隔线
+            st.markdown("---")
         if delete_keys:
             for dk in delete_keys:
                 # 删除当前二维码对应合同时清空显示
@@ -261,7 +263,7 @@ with col_right:
     with head_l:
         st.markdown("### 💬 Intelligent Q&A")
     with head_r:
-        if st.button("🗑 Clear Chat"):
+        if st.button("🗑"):
             st.session_state.chat = []
             st.rerun()
 
