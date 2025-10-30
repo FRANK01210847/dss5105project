@@ -1,7 +1,10 @@
 {
   "property_id": "2025001",
-  "tenant_name": "gyh",
-  "monthly_rent": 1950,
-  "last_updated": "2025-10-25 02:28:23",
-  "version_note": "v1"
+  "tenant_name": "xiaogan",
+  "monthly_rent": 500,
+  "last_updated": "2025-10-30 15:54:10",
+  "version_note": "v1",
+  "cloud_link": "",
+  "qr_code": "",
+  "previous_version": "2025-10-30 15:50:18"
 }

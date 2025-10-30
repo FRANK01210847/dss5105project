@@ -8,16 +8,13 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=ROOT / ".env")
 
-
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-
-
-
 
 
 # ---------- 基础工具 ----------
@@ -42,7 +39,7 @@ def _ensure_key(explicit: Optional[str]) -> str:
     load_dotenv(dotenv_path=ROOT / ".env", override=False)
     key = explicit or os.getenv("OPENAI_API_KEY")
     if not key:
-        raise ValueError("未检测到 OPENAI_API_KEY；请在 .env 中配置或在侧边栏输入。")
+        raise ValueError("Lack of OPENAI_API_KEY; please configure it in .env or enter it in the sidebar.")
     return key
 
 
@@ -111,7 +108,12 @@ def create_conversation_chain(
 
     chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
+        retriever = vectorstore.as_retriever(
+            search_kwargs={
+                "k": 5,  # 稍微增加检索数量
+                "score_threshold": 0.5  # 显著降低相似度阈值
+            }
+        ),
         memory=memory,
         return_source_documents=True
     )

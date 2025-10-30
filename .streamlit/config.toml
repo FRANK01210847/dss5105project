@@ -1,0 +1,10 @@
+[server]
+maxUploadSize = 10
+enableStaticServing = true
+
+[theme]
+primaryColor = "#2E8B57"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"

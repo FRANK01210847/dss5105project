@@ -1,19 +1,15 @@
 import os
 import json
 import hashlib
+import base64
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 from dotenv import load_dotenv
 
-# 🧠 核心 LangChain 结构
 from langchain.agents import initialize_agent, AgentType
-
 from langchain_community.chat_models import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
-
-
-
 
 from utils.rag_utils import (
     load_vectorstore,
@@ -26,283 +22,249 @@ from utils.rent_tools import (
     get_repair_responsibility,
 )
 
-# ============== 初始化配置 ==============
+# ================== 初始化配置 ==================
 load_dotenv()
-st.set_page_config(page_title="租客助手 | Smart Rental", page_icon="💬", layout="wide")
+st.set_page_config(page_title="Tenant Chat | Smart Rental", page_icon="💬", layout="wide")
 
-# 🚫 完全禁用侧边导航栏
 st.markdown("""
     <style>
-    /* 隐藏整个侧边导航容器 */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNavLink"],
-    [data-testid="stSidebarNavSection"],
-    [data-testid="stSidebarHeader"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-
-    /* 调整侧边栏宽度，只保留自定义的用户信息 */
-    [data-testid="stSidebar"] {
-        width: 220px !important;
-    }
+    [data-testid="stSidebarNav"], [data-testid="stSidebarHeader"] {display:none!important;}
+    [data-testid="stSidebar"] {width:220px!important;}
     </style>
 """, unsafe_allow_html=True)
 
-# ============== 登录校验 ==============
+# ================== 登录验证 ==================
 if st.session_state.get("user_role") != "tenants":
-    st.warning("请先以【租客】身份登录。")
+    st.warning("Please log in as a tenant to access this page.")
     st.switch_page("app.py")
 
-# ============== 侧边栏：用户信息与配置 ==============
+# ================== 侧边栏 ==================
 with st.sidebar:
-    username = st.session_state.get("username", "未知用户")
-    st.markdown(f"👋 **当前用户：{username}**")
+    username = st.session_state.get("username", "Unknown User")
+    st.markdown(f"👋 **Current User: {username}**")
 
-    # 登出按钮
-    if st.button("🚪 退出登录", use_container_width=True):
+    if st.button("🚪 Logout", use_container_width=True):
         st.session_state.clear()
         st.switch_page("app.py")
 
     st.markdown("---")
-
-    # API Key 状态
     api_key = os.getenv("OPENAI_API_KEY") or st.session_state.get("openai_key")
     if api_key:
-        st.success("✅ 已检测到 OpenAI API Key")
+        st.success("✅ Detected OpenAI API Key")
     else:
-        key_input = st.text_input("🔑 请输入 OpenAI API Key", type="password")
+        key_input = st.text_input("🔑 Enter OpenAI API Key", type="password")
         if key_input:
             os.environ["OPENAI_API_KEY"] = key_input
             st.session_state["openai_key"] = key_input
-            st.success("✅ API Key 已保存")
+            st.success("✅ API Key saved")
 
-    st.markdown("---")
-
-# ============== 工具函数 ==============
-def _file_sha1(uploaded_file) -> str:
+# ================== 工具函数 ==================
+def _file_sha1(uploaded_file):
     data = uploaded_file.getvalue() if hasattr(uploaded_file, "getvalue") else uploaded_file.read()
     return hashlib.sha1(data).hexdigest()
 
+def scroll_to_bottom():
+    st_html("<script>window.scrollTo(0, document.body.scrollHeight);</script>", height=0)
+
 def rebuild_pipeline_from_loaded_contracts():
-    """基于当前加载的合同重建 RAG + Agent"""
+    """根据当前合同重新构建 RAG + Agent"""
     vs_values = list(st.session_state.vectorstores_map.values())
     if not vs_values:
         st.session_state.conversation_chain = None
         st.session_state.chain_invoke_safe = None
         st.session_state.agent = None
         return
+    try:
+        first_vs = vs_values[0]
+        chain, llm, memory, chain_invoke_safe = create_conversation_chain(
+            first_vs, openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
+        tools = [calculate_rent, calculate_moveout_date, get_repair_responsibility]
+        agent = initialize_agent(
+            tools=tools,
+            llm=llm,
+            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+            verbose=False,
+            memory=memory,
+            handle_parsing_errors=True,
+        )
+        st.session_state.conversation_chain = chain
+        st.session_state.chain_invoke_safe = chain_invoke_safe
+        st.session_state.agent = agent
+    except Exception as e:
+        st.error(f"❌ Pipeline rebuild failed: {e}")
 
-    base = vs_values[0]
-    for other in vs_values[1:]:
-        try:
-            base.merge_from(other)
-        except Exception as e:
-            msg = str(e)
-            if "already exist" in msg:
-                try:
-                    base_ids = set(getattr(base.docstore, "_dict", {}).keys())
-                    other_store = getattr(other, "docstore", None)
-                    other_ids = list(getattr(other_store, "_dict", {}).keys()) if other_store else []
-                    new_ids = [i for i in other_ids if i not in base_ids]
-                    if new_ids:
-                        new_docs = [other_store._dict[i] for i in new_ids]
-                        base.add_documents(new_docs)
-                except Exception:
-                    st.info("检测到重复合同或片段，已跳过重复内容。")
-            else:
-                raise
-
-    merged_vs = base
-    chain, llm, memory, chain_invoke_safe = create_conversation_chain(
-        merged_vs, openai_api_key=os.getenv("OPENAI_API_KEY")
-    )
-    tools = [calculate_rent, calculate_moveout_date, get_repair_responsibility]
-    agent = initialize_agent(
-        tools=tools,
-        llm=llm,
-        agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=False,
-        memory=memory,
-    )
-    st.session_state.conversation_chain = chain
-    st.session_state.chain_invoke_safe = chain_invoke_safe
-    st.session_state.agent = agent
-
-def scroll_to_bottom():
-    st_html(
-        """
-        <script>
-            var chatDiv = window.parent.document.querySelector('.main');
-            if (chatDiv) { chatDiv.scrollTop = chatDiv.scrollHeight; }
-        </script>
-        """,
-        height=0
-    )
-
-# ============== 初始化状态 ==============
+# ================== 初始化 session 状态 ==================
 defaults = {
     "chat": [],
     "vectorstores_map": {},
     "loaded_keys": set(),
+    "contract_meta_map": {},
     "conversation_chain": None,
     "chain_invoke_safe": None,
     "agent": None,
-    "current_contract_link": None,  # 当前合同的云端链接
-    "current_contract_qr": None,    # 当前合同的二维码路径
-    "current_contract_id": None     # 当前合同的ID
+    "tenant_last_qr": None,
+    "tenant_last_contract_id": None
 }
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 顶部品牌
+# ================== 页面标题 ==================
 st.markdown("""
 <div style="background:#2E8B57;padding:12px 16px;border-radius:12px;margin-bottom:16px;">
-  <h3 style="color:#fff;margin:0;">💬 租客智能助手</h3>
+  <h3 style="color:#fff;margin:0;">💬 Tenant Smart Assistant</h3>
 </div>
 """, unsafe_allow_html=True)
 
-# ============== 左右布局 ==============
-col_left, col_right = st.columns([1.15, 2], gap="large")
+col_left, col_right = st.columns([1.1, 2], gap="large")
 
-# ---------------- 左侧：合同管理 ----------------
+# ======================================================================
+# 左侧：合同管理
+# ======================================================================
 with col_left:
-    st.markdown("### 📂 合同管理")
-    
+    st.markdown("### 📂 Contract Management")
 
-    contract_id = st.text_input("输入租约编号（如 MSH2025-001）")
-    if st.button("📥 加载数据库合同", use_container_width=True):
+    contract_id = st.text_input("Enter Lease ID (e.g., 2025002)")
+    if st.button("📥 Load Database Contract", use_container_width=True):
         cid = contract_id.strip()
         if not cid:
-            st.info("⚠️ 请先输入合同编号再加载。")
+            st.info("⚠️ Please enter a lease ID before loading.")
         else:
             db_path = os.path.join("db", cid)
             if not os.path.isdir(db_path):
-                st.error("❌ 未找到该租约编号。")
+                st.error("❌ Lease ID not found.")
             else:
-                # 检查新合同的云端链接信息
-                meta_path = os.path.join(db_path, "metadata.json")
-                if os.path.exists(meta_path):
-                    with open(meta_path, "r", encoding="utf-8") as f:
-                        meta = json.load(f)
-                        # 如果新合同有云端链接，更新快速访问
-                        if meta.get("cloud_link"):
-                            st.session_state.current_contract_link = meta["cloud_link"]
-                            st.session_state.current_contract_id = cid
-                            if meta.get("qr_code"):
-                                qr_path = os.path.join(db_path, meta["qr_code"])
-                                if os.path.exists(qr_path):
-                                    st.session_state.current_contract_qr = qr_path
-                            st.success("✅ 已更新快速访问链接")
-                        else:
-                            # 如果新合同没有云端链接，清除快速访问
-                            st.session_state.current_contract_link = None
-                            st.session_state.current_contract_id = None
-                            st.session_state.current_contract_qr = None
-                            if "current_contract_link" in st.session_state and st.session_state.current_contract_link:
-                                st.info("ℹ️ 新合同无云端链接，已清除快速访问")
-                
                 key = f"db:{cid}"
                 if key in st.session_state.loaded_keys:
-                    st.info("已加载该合同，自动跳过重复。")
+                    st.info("Contract already loaded.")
                 else:
-                    with st.spinner("正在加载合同..."):
+                    with st.spinner("Loading contract..."):
                         try:
                             vs = load_vectorstore(db_path, os.getenv("OPENAI_API_KEY"))
                             st.session_state.vectorstores_map[key] = vs
                             st.session_state.loaded_keys.add(key)
+
+                            meta = {"contract_id": cid}
+                            meta_path = os.path.join(db_path, "metadata.json")
+                            if os.path.exists(meta_path):
+                                with open(meta_path, "r", encoding="utf-8") as f:
+                                    meta.update(json.load(f))
+                            st.session_state.contract_meta_map[key] = meta
                             rebuild_pipeline_from_loaded_contracts()
-                            st.success(f"✅ 已加载数据库合同：{cid}")
+                            st.success(f"✅ Database contract loaded: {cid}")
+
+                            # 云端链接与二维码
+                            cloud_link = meta.get("cloud_link")
+                            qr_code = meta.get("qr_code")
+                            if cloud_link or qr_code:
+                                html_block = "<hr><h4>☁️ Contract Quick Access</h4>"
+                                if cloud_link:
+                                    html_block += f"<p><a href='{cloud_link}' target='_blank'>{cloud_link}</a></p>"
+                                if qr_code:
+                                    qr_path = os.path.join(db_path, qr_code)
+                                    if os.path.exists(qr_path):
+                                        st.session_state["tenant_last_qr"] = qr_path
+                                        st.session_state["tenant_last_contract_id"] = cid
+                                        b64 = base64.b64encode(open(qr_path, "rb").read()).decode()
+                                        html_block += f"<img src='data:image/png;base64,{b64}' width='150'>"
+                                st.session_state["last_contract_display"] = html_block
                         except Exception as e:
-                            st.error(f"❌ 加载失败：{e}")
+                            st.error(f"❌ Loading failed: {e}")
 
-    # 显示当前加载合同的云端链接和二维码
-    if st.session_state.current_contract_link:
-        st.markdown("---")
-        st.markdown("### 📱 当前合同快速访问")
-        st.info(f"**当前合同：** {st.session_state.current_contract_id}")
-        cols = st.columns([2, 1])
-        with cols[0]:
-            st.markdown(f"**云端链接：**\n{st.session_state.current_contract_link}")
-        if st.session_state.current_contract_qr:
-            with cols[1]:
-                st.image(st.session_state.current_contract_qr, caption="扫码访问")
+    # ✅ 二维码持久显示
+    if st.session_state.get("last_contract_display"):
+        st.markdown(st.session_state["last_contract_display"], unsafe_allow_html=True)
 
-
+    # === 上传临时合同 ===
     st.markdown("---")
-    st.subheader("📎 上传我的合同 PDF")
-    up = st.file_uploader("选择 PDF 文件", type=["pdf"])
-    if up and st.button("📄 解析 PDF 合同", use_container_width=True):
+    st.subheader("📎 Upload My Contract PDF (Temporary)")
+    up = st.file_uploader("Select PDF file", type=["pdf"])
+    if up and st.button("📄 Parse Contract", use_container_width=True):
         sha1 = _file_sha1(up)
-        up_key = f"upload:{sha1}:{getattr(up, 'size', 0)}"
+        up_key = f"upload:{sha1}"
         if up_key in st.session_state.loaded_keys:
-            st.info("该 PDF 已加载，自动跳过重复。")
+            st.info("This PDF is already loaded.")
         else:
-            with st.spinner("正在解析并构建索引..."):
+            with st.spinner("Parsing and building index..."):
                 try:
                     vs = build_vectorstore_from_pdf(up, openai_api_key=os.getenv("OPENAI_API_KEY"))
                     st.session_state.vectorstores_map[up_key] = vs
                     st.session_state.loaded_keys.add(up_key)
+                    st.session_state.contract_meta_map[up_key] = {
+                        "contract_id": f"Uploaded-{sha1[:6]}",
+                        "source": "upload",
+                    }
                     rebuild_pipeline_from_loaded_contracts()
-                    st.success(f"✅ 已加载自定义合同：{up.name}")
+                    st.success(f"✅ Contract loaded: {up.name}")
                 except Exception as e:
-                    st.error(f"❌ 解析失败：{e}")
+                    st.error(f"❌ Parsing failed: {e}")
 
-   # ---------------- 当前已加载合同显示 ----------------
-    st.markdown("### 📄 当前已加载合同")
-
+    # === 删除合同 ===
+    st.markdown("---")
+    st.markdown("### 📄 Loaded Contracts")
     if st.session_state.vectorstores_map:
-        delete_keys = []  # 记录要删除的键
-
+        delete_keys = []
         for key in list(st.session_state.vectorstores_map.keys()):
-            # 判断来源与显示名
-            if key.startswith("db:"):
-                source = "📁 数据库"
-                name = key.replace("db:", "")
-            elif key.startswith("upload:"):
-                source = "📎 上传文件"
-                name = f"{key.split(':')[1][:8]}..."  # 用 SHA1 的前几位代替
-            else:
-                source = "❓ 其他"
-                name = key
-
-            # 每一行显示
-            cols = st.columns([2, 3, 1])
+            meta = st.session_state.contract_meta_map.get(key, {})
+            cols = st.columns([3, 2, 1])
             with cols[0]:
-                st.markdown(f"**{source}**")
+                name = meta.get("property_id") or meta.get("contract_id") or key
+                icon = "📁" if key.startswith("db:") else "📎"
+                st.markdown(f"**{icon} {name}**")
             with cols[1]:
-                st.markdown(name)
-            with cols[2]:
-                if st.button("❌", key=f"del_{key}", use_container_width=True):
-                    delete_keys.append(key)
+                rent_val = meta.get("monthly_rent")
+                # 如果元数据中没有租金，则尝试自动解析合同文本中的金额
+                if not rent_val:
+                    try:
+                        contract_path = os.path.join("db", meta.get("contract_id", ""), "contract.pdf")
+                        if os.path.exists(contract_path):
+                            from langchain_community.document_loaders import PyPDFLoader
+                            loader = PyPDFLoader(contract_path)
+                            pages = loader.load()
+                            text = "\n".join(p.page_content for p in pages)
+                            import re
+                            match = re.search(r"\$?\s?S?\$?\s?(\d{3,6})", text)
+                            if match:
+                                rent_val = f"S${match.group(1)}"
+                                meta["monthly_rent"] = rent_val  # 缓存到 session
+                    except Exception:
+                        pass
+                st.write(f"Rent: {rent_val}" if rent_val else "Rent: —")
 
-        # 执行删除操作
+            with cols[2]:
+                if st.button("❌", key=f"del_{key}", help="Remove this contract"):
+                    delete_keys.append(key)
         if delete_keys:
-            for k in delete_keys:
-                if k in st.session_state.vectorstores_map:
-                    del st.session_state.vectorstores_map[k]
-                st.session_state.loaded_keys.discard(k)
+            for dk in delete_keys:
+                # 删除当前二维码对应合同时清空显示
+                if st.session_state.get("tenant_last_contract_id") and \
+                   st.session_state["tenant_last_contract_id"] in dk:
+                    st.session_state["tenant_last_qr"] = None
+                    st.session_state["last_contract_display"] = None
+                    st.session_state["tenant_last_contract_id"] = None
+
+                st.session_state.vectorstores_map.pop(dk, None)
+                st.session_state.loaded_keys.discard(dk)
+                st.session_state.contract_meta_map.pop(dk, None)
             rebuild_pipeline_from_loaded_contracts()
             st.rerun()
-
-        st.success(f"✅ 当前合同总数：{len(st.session_state.vectorstores_map)}")
+        st.success(f"✅ Current contract count: {len(st.session_state.vectorstores_map)}")
     else:
-        st.info("📭 暂无已加载合同。可从数据库加载或上传 PDF 文件。")
+        st.info("📭 No contracts loaded yet.")
 
-
-# ---------------- 右侧：智能问答 ----------------
+# ======================================================================
+# 右侧：聊天问答
+# ======================================================================
 with col_right:
-    # 标题 + 清空按钮
-    col1, col2 = st.columns([6, 1])
-    with col1:
-        st.markdown("### 💬 智能问答")
-    with col2:
-        if st.button("🗑️", help="清空聊天记录"):
+    head_l, head_r = st.columns([6, 1])
+    with head_l:
+        st.markdown("### 💬 Intelligent Q&A")
+    with head_r:
+        if st.button("🗑 Clear Chat"):
             st.session_state.chat = []
             st.rerun()
 
-    # 聊天内容容器
     chat_container = st.container()
     with chat_container:
         for role, text in st.session_state.chat:
@@ -310,27 +272,7 @@ with col_right:
                 st.markdown(text)
     scroll_to_bottom()
 
-    # 固定输入框
-    st.markdown(
-        """
-        <style>
-            .stChatInputContainer {
-                position: fixed !important;
-                bottom: 1rem !important;
-                width: 58% !important;
-                right: 1rem !important;
-                z-index: 999;
-                background: white;
-                padding-top: 0.5rem;
-                border-top: 1px solid #ddd;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-    q = st.chat_input("请输入问题（如：外交条款是什么？可以直接问，不必先加载合同）")
-
+    q = st.chat_input("Ask a question about your rental contract...")
     if q:
         st.session_state.chat.append(("user", q))
         with st.chat_message("user"):
@@ -339,65 +281,24 @@ with col_right:
 
         with st.chat_message("assistant"):
             thinking = st.empty()
-            thinking.markdown("🤔 思考中...")
+            thinking.markdown("🤔 Thinking...")
 
             reply = ""
             contract_info = ""
 
-            # 1️⃣ 尝试 RAG
             if st.session_state.chain_invoke_safe:
                 try:
                     res = st.session_state.chain_invoke_safe({"question": q})
                     contract_info = res.get("answer", "")
                 except Exception:
-                    pass
+                    contract_info = ""
 
-            # 2️⃣ 判断是否调用工具
-            intent = "NO"
-            try:
-                intent_llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
-                prompt = ChatPromptTemplate.from_messages([
-                    ("system", "判断用户是否需要计算租金、退租时间或维修责任。若需要，请回答 YES，否则回答 NO。"),
-                    ("human", "{q}")
-                ])
-                ic_chain = LLMChain(llm=intent_llm, prompt=prompt)
-                intent = ic_chain.run({"q": q}).strip().upper()
-            except Exception:
-                pass
-
-            # 3️⃣ 调用 Agent（若需要工具）
-            if intent == "YES" and st.session_state.agent:
-                try:
-                    fused = (
-                        f"请根据以下合同信息，先提取相关数据再回答问题：\n\n"
-                        f"【合同内容】\n{contract_info}\n\n"
-                        f"【用户问题】{q}\n\n"
-                        f"如果需要计算，请自动从合同中推断租金、租期等信息并调用合适的工具。"
-                    )
-                    result = st.session_state.agent.invoke({"input": fused})
-                    reply = (
-                        result.get("output")
-                        or result.get("answer")
-                        or result.get("result")
-                        or str(result)
-                    )
-                    reply = reply.split("Observation:")[-1].strip()
-                except Exception:
-                    reply = ""
-
-
-            # 4️⃣ 无 Agent → 普通 LLM
-            if not reply:
-                try:
-                    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.2, openai_api_key=os.getenv("OPENAI_API_KEY"))
-                    prompt = ChatPromptTemplate.from_messages([
-                        ("system", "你是租房助手，请直接给出最终答案，不展示思考过程。"),
-                        ("human", f"{q}\n\n（合同上下文，如有）：{contract_info}")
-                    ])
-                    ans_chain = LLMChain(llm=llm, prompt=prompt)
-                    reply = ans_chain.run({"q": q})
-                except Exception:
-                    reply = "抱歉，暂时无法回答。"
+            llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.3, openai_api_key=os.getenv("OPENAI_API_KEY"))
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", "You are a helpful English-speaking rental assistant."),
+                ("human", "{q}\n\nContract context:\n{ctx}")
+            ])
+            reply = LLMChain(llm=llm, prompt=prompt).run({"q": q, "ctx": contract_info})
 
             thinking.empty()
             st.markdown(reply)

@@ -14,16 +14,16 @@ def _hash_password(p: str) -> str:
 def register_user(username: str, password: str, role: str, email: str=""):
     _init_user_db()
     with open(USER_DB_PATH, "r", encoding="utf-8") as f: users = json.load(f)
-    if role not in users: return False, "无效的用户角色。"
-    if username in users[role]: return False, f"用户名 {username} 已存在。"
+    if role not in users: return False, "Invalid user role."
+    if username in users[role]: return False, f"Username {username} already exists."
     users[role][username] = {"password": _hash_password(password), "email": email}
     with open(USER_DB_PATH, "w", encoding="utf-8") as f: json.dump(users, f, indent=4, ensure_ascii=False)
-    return True, f"注册成功，欢迎 {username}！"
+    return True, f"Registration successful, welcome {username}!"
 
 def authenticate_user(username: str, password: str, role: str):
     _init_user_db()
     with open(USER_DB_PATH, "r", encoding="utf-8") as f: users = json.load(f)
-    if role not in users: return False, "用户角色无效。"
-    if username not in users[role]: return False, "用户不存在。"
-    if users[role][username]["password"] != _hash_password(password): return False, "密码错误。"
-    return True, "登录成功！"
+    if role not in users: return False, "Invalid user role."
+    if username not in users[role]: return False, "User does not exist."
+    if users[role][username]["password"] != _hash_password(password): return False, "Incorrect password."
+    return True, "Login successful!"

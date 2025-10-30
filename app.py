@@ -5,7 +5,11 @@ import time
 import os
 
 # ========== 初始化配置 ==========
-load_dotenv()
+try:
+    load_dotenv()
+except Exception:
+    pass
+
 st.set_page_config(page_title="🏠 Smart Rental Assistant", page_icon="🏠", layout="centered")
 
 # 隐藏默认侧边栏
@@ -39,60 +43,76 @@ if "user_role" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
+# ✅ 页面跳转函数（稳定写法）
+def go_to(page_name: str):
+    """
+    页面跳转函数。
+    支持 /pages/tenant_chat.py、/pages/landlord_portal.py、/pages/register.py。
+    """
+    try:
+        if page_name == "tenant_chat":
+            st.switch_page("pages/tenant_chat.py")
+        elif page_name == "landlord_portal":
+            st.switch_page("pages/landlord_portal.py")
+        elif page_name == "register":
+            st.switch_page("pages/register.py")
+    except Exception as e:
+        st.error(f"Navigation error: {e}")
+
 # ========== 登录状态检测 ==========
 if st.session_state.user_role == "landlords":
-    st.switch_page("pages/landlord_portal.py")
+    go_to("landlord_portal")
 elif st.session_state.user_role == "tenants":
-    st.switch_page("pages/tenant_chat.py")
+    go_to("tenant_chat")
 
 # ========== 页面头部 ==========
 st.markdown("""
 <div style="text-align:center; margin-bottom: 1rem;">
   <h1 style='color:#2E8B57; margin-bottom:0;'>🏠 Smart Rental Assistant</h1>
-  <p style='color:gray; font-size:1.05em;'>登录以开始使用智能租房助手</p>
+  <p style='color:gray; font-size:1.05em;'>Login to start using the Smart Rental Assistant</p>
 </div>
 """, unsafe_allow_html=True)
 
 # ========== 登录表单 ==========
 with st.form("login_form", clear_on_submit=False):
-    st.markdown("### 🔑 登录账号")
+    st.markdown("### 🔑 Account Login")
     col1, col2 = st.columns([1.2, 1.8])
     with col1:
-        role_display = st.radio("身份：", ["租客", "房东"], horizontal=True)
+        role_display = st.radio("Role:", ["Tenant", "Landlord"], horizontal=True)
     with col2:
-        username = st.text_input("用户名", placeholder="请输入用户名")
-        password = st.text_input("密码", type="password", placeholder="请输入密码")
+        username = st.text_input("Username", placeholder="Enter your username")
+        password = st.text_input("Password", type="password", placeholder="Enter your password")
 
-    role_map = {"租客": "tenants", "房东": "landlords"}
+    role_map = {"Tenant": "tenants", "Landlord": "landlords"}
     role = role_map[role_display]
 
-    login_btn = st.form_submit_button("登录", use_container_width=True)
+    login_btn = st.form_submit_button("Login", use_container_width=True)
 
 if login_btn:
     if not username or not password:
-        st.warning("⚠️ 请输入用户名和密码。")
+        st.warning("⚠️ Please enter your username and password.")
     else:
-        with st.spinner("正在验证身份..."):
+        with st.spinner("Verifying identity..."):
             time.sleep(0.8)
             success, msg = authenticate_user(username, password, role)
             if success:
                 st.session_state.username = username
                 st.session_state.user_role = role
-                st.success("✅ 登录成功！正在跳转...")
+                st.success("✅ Login successful! Redirecting...")
                 time.sleep(1)
                 if role == "landlords":
-                    st.switch_page("pages/landlord_portal.py")
+                    go_to("landlord_portal")
                 else:
-                    st.switch_page("pages/tenant_chat.py")
+                    go_to("tenant_chat")
             else:
                 st.error(msg)
 
-# ========== 注册区域 ==========
+# ========== Registration Area ==========
 st.markdown("---")
-st.info("还没有账号？点击下方按钮注册 👇")
+st.info("Don't have an account? Click the button below to register 👇")
 
-if st.button("📝 注册新账号", use_container_width=True):
-    st.switch_page("pages/register.py")
+if st.button("📝 Register New Account", use_container_width=True):
+    go_to("register")
 
 # ========== 页脚 ==========
 st.markdown("""
