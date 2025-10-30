@@ -1,0 +1,16 @@
+{
+  "property_id": "2025006",
+  "tenant_name": "Ms. Priya Nair",
+  "landlord_name": "Mr. Jonathan Ong",
+  "property_address": "25 Lorong 33 Geylang #05-06, Singapore 387985",
+  "monthly_rent": "S$3,600",
+  "deposit": "S$7,200",
+  "lease_start": "2025-12-01",
+  "lease_end": "2026-11-30",
+  "lease_term_months": 12,
+  "last_updated": "2025-10-30 23:30:55",
+  "version_note": "v1",
+  "cloud_link": "https://www.dropbox.com/scl/fi/fniigenddxnr8vjdnk9jc/Virtual_Tenancy_Agreement_3.pdf?rlkey=5gedkb509bg1li6pfy0tepc6f&st=10t4t4mn&dl=1",
+  "qr_code": "contract_qr.png",
+  "previous_version": null
+}

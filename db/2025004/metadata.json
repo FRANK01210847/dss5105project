@@ -1,0 +1,16 @@
+{
+  "property_id": "2025004",
+  "tenant_name": "Daniel Wei Lee",
+  "landlord_name": "Olivia Mei Chen",
+  "property_address": "12 River Valley Road #08-05, Singapore 238630",
+  "monthly_rent": "S$4,200",
+  "deposit": "S$8,400",
+  "lease_start": "2025-12-01",
+  "lease_end": "2026-12-01",
+  "lease_term_months": 12,
+  "last_updated": "2025-10-30 23:30:05",
+  "version_note": "v1",
+  "cloud_link": "https://www.dropbox.com/scl/fi/c50md5nmlktm65pymusve/Virtual_Tenancy_Agreement.pdf?rlkey=9935fgqm5h4a1pe0g8h0jbo1u&st=dnwxcmo5&dl=1",
+  "qr_code": "contract_qr.png",
+  "previous_version": null
+}

@@ -1,0 +1,15 @@
+{
+  "property_id": "2025008",
+  "tenant_name": "xiaotang",
+  "landlord_name": "Mrs. Sarah Lim Hui Wen",
+  "property_address": "78 Compassvale Bow, #15-09, Singapore 544784",
+  "monthly_rent": "S$3,200",
+  "deposit": "S$6,400",
+  "lease_start": "2026-01-01",
+  "lease_end": "2026-09-30",
+  "lease_term_months": 9,
+  "last_updated": "2025-10-31 04:23:56",
+  "cloud_link": "https://www.dropbox.com/scl/fi/elu7ktwqp8ear0pbqnkne/TENANCY-AGREEMENT-2.pdf?rlkey=uwnbq1by2ae9oiizthgmwzd45&st=6ng1t6q2&dl=0",
+  "qr_code": "contract_qr.png",
+  "previous_version": "2025-10-31 04:18:21"
+}

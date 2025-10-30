@@ -1,0 +1,16 @@
+{
+  "property_id": "2025005",
+  "tenant_name": "Rachel Tan Mei Ling",
+  "landlord_name": "Mohammad Amir bin Hassan",
+  "property_address": "Blk 321, Clementi Avenue 4, #12-05, Singapore 120321",
+  "monthly_rent": "S$2,800",
+  "deposit": "S$5,600",
+  "lease_start": "2025-11-01",
+  "lease_end": "2026-04-30",
+  "lease_term_months": 6,
+  "last_updated": "2025-10-30 23:30:29",
+  "version_note": "v1",
+  "cloud_link": "https://www.dropbox.com/scl/fi/gzg7hsezm5qqsb59k1yyh/Virtual_Tenancy_Agreement_2.pdf?rlkey=vzdd1z5sfdr86k136drsoqvdu&st=m34lsi0i&dl=1",
+  "qr_code": "contract_qr.png",
+  "previous_version": null
+}
