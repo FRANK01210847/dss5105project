@@ -1,0 +1,38 @@
+{
+    "landlords": {
+        "ken": {
+            "password": "e9cee71ab932fde863338d08be4de9dfe39ea049bdafb342ce659ec5450b69ae",
+            "email": ""
+        },
+        "makabaka": {
+            "password": "010ab7400efc22e69be4da065eb06e03a9edbce360845b1f43009e1a7b942b9e",
+            "email": ""
+        }
+    },
+    "tenants": {
+        "ken": {
+            "password": "e9cee71ab932fde863338d08be4de9dfe39ea049bdafb342ce659ec5450b69ae",
+            "email": "ken@example.com"
+        },
+        "makabaka": {
+            "password": "010ab7400efc22e69be4da065eb06e03a9edbce360845b1f43009e1a7b942b9e",
+            "email": ""
+        },
+        "111": {
+            "password": "f6e0a1e2ac41945a9aa7ff8a8aaa0cebc12a3bcc981a929ad5cf810a090e11ae",
+            "email": ""
+        },
+        "suntianxiang": {
+            "password": "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f",
+            "email": ""
+        },
+        "Makabaka": {
+            "password": "50f61ef06f48152af5cbef623413dd466346b44a6168d3e17d9beee7d59355b8",
+            "email": ""
+        },
+        "aba": {
+            "password": "e124adcce1fb2f88e1ea799c3d0820845ed343e6c739e54131fcb3a56e4bc1bd",
+            "email": ""
+        }
+    }
+}
